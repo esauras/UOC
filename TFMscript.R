@@ -241,6 +241,24 @@ ann <- ann %>%
 ann <- data.frame(ann)
 dataDG <- as.data.frame(dataDEGs[order(rownames(dataDEGs)),])
 resultKIRP <- cbind(ann,dataDG)
+resultKIRP <- resultKIRP[with(resultKIRP, order(resultKIRP$FDR)), ]
+top10KIRP <- head(resultKIRP,10)
+
+ansEA <- TCGAanalyze_EAcomplete(TFname="DEA genes Normal Vs Tumor",
+                                RegulonList = resultKIRP[,2])  
+
+TCGAvisualize_EAbarplot(tf = rownames(ansEA$ResBP),
+                        GOBPTab = ansEA$ResBP,
+                        GOCCTab = ansEA$ResCC,
+                        GOMFTab = ansEA$ResMF,
+                        PathTab = ansEA$ResPat,
+                        nRGTab = resultKIRP[,2],
+                        nBar = 10)
+
+## GOANA
+library(limma)
+goKIRP <- goana(resultKIRP[,1],geneid=resultKIRP[,2],species="Hs")
+topGOKIRP <- head(goKIRP,10)
 
 ## Filtrar muestras
 unique(KICHexp$tcga_participant_barcode)
@@ -339,6 +357,24 @@ ann2 <- ann2 %>%
 ann2 <- data.frame(ann2)
 dataDG2 <- as.data.frame(dataDEGs2[order(rownames(dataDEGs2)),])
 resultKICH <- cbind(ann2,dataDG2)
+resultKICH <- resultKICH[with(resultKICH, order(resultKICH$FDR)), ]
+top10KICH <- head(resultKICH,10)
+
+ansEA2 <- TCGAanalyze_EAcomplete(TFname="DEA genes Normal Vs Tumor",
+                                RegulonList = resultKICH[,2])  
+
+TCGAvisualize_EAbarplot(tf = rownames(ansEA2$ResBP),
+                        GOBPTab = ansEA2$ResBP,
+                        GOCCTab = ansEA2$ResCC,
+                        GOMFTab = ansEA2$ResMF,
+                        PathTab = ansEA2$ResPat,
+                        nRGTab = resultKICH[,2],
+                        nBar = 10)
+
+## GOANA
+library(limma)
+goKICH <- goana(resultKICH[,1],geneid=resultKICH[,2],species="Hs")
+topGOKICH <- head(goKICH,10)
 
 ## ESTIMATE
 library(utils)
@@ -346,6 +382,132 @@ library(utils)
 ## install.packages("estimate", repos=rforge, dependencies=TRUE)
 library(estimate)
 help(package="estimate")
+
+## Immune_score
+setwd("C:/Users/Esther/Desktop/Máster Bioinformática y Bioestadística/TFM/ESTIMATE")
+KIRPscore <- read.csv("kidney_renal_papillary_cell_carcinoma_RNAseqV2.txt",sep="\t")
+KIRPscore
+
+## Seleccionar las muestras que coinciden (list2)
+idfilt <- c()
+for (i in KIRPscore$ID){
+  z <- unlist(strsplit(i,"-"))
+  idfilt <- c(idfilt,paste0(z[1],"-",z[2],"-",z[3]))
+}
+idfilt2 <- unique(idfilt[idfilt %in% list2])
+
+KIRPscore$ID <- idfilt
+nums <- which(KIRPscore$ID %in% idfilt2)
+options(max.print=999999)
+
+## Base de datos IMMUNESCORE depurada
+newKIRPscore <- KIRPscore[nums,]
+newKIRPscore <- read.csv("KIRPscore.csv") ## Abrir directamente
+newKIRPscore <- newKIRPscore[,c(2:5)]
+
+## De aquí seleccionar dos grupos (<0 y >0)
+scorepos <- which(newKIRPscore$Immune_score >0) ## 150
+scoreneg <- which(newKIRPscore$Immune_score <0) ## 128
+
+## COSMIC
+setwd(wd)
+COSM <- read.csv("COSMICsignatures.csv", sep=";")
+COSM <- t(COSM)
+COSM <- COSM[-(1:2),]
+
+nfilt <- c()
+for (i in rownames(COSM)){
+  a <- unlist(strsplit(i,"[[:punct:]]"))
+  nfilt <- c(nfilt,paste0(a[1],"-",a[2],"-",a[3]))
+}
+nfilt2 <- nfilt[nfilt %in% list2]
+
+rownames(COSM) <- nfilt
+num <- which(rownames(COSM) %in% nfilt2)
+
+## Base de datos COSMIC depurada
+newCOSM <- COSM[num,]
+newCOSM <- read.csv("COSM.csv") ## Abrir directamente
+
+## Correlación
+newKIRP <- cbind(newCOSM,newKIRPscore$Immune_score)
+colnames(newKIRP)[32] <- "Immune_score"
+hist(newKIRP$Immune_score,xlab="Immune_score",main="Histogram of Immune_score",col=("snow2"))
+shapiro.test(newKIRP$Immune_score) ## No normalidad - pruebas no paramétricas
+
+gr <- c()
+for (i in newKIRP$Immune_score){
+  if (i > median(newKIRP$Immune_score)) gr <- c(gr,"G2")
+  else gr <- c(gr,"G1")
+}
+newKIRP <- cbind(newKIRP,gr)
+gr2 <- c()
+for (i in newKIRP$Immune_score){
+  if ((quantile(newKIRP$Immune_score)[1] <= i) && (i < quantile(newKIRP$Immune_score)[2])) 
+    gr2 <- c(gr2,"Q1")
+  if ((quantile(newKIRP$Immune_score)[2] <= i) && (i < quantile(newKIRP$Immune_score)[3])) 
+    gr2 <- c(gr2,"Q2")
+  if ((quantile(newKIRP$Immune_score)[3] <= i) && (i < quantile(newKIRP$Immune_score)[4])) 
+    gr2 <- c(gr2,"Q3")
+  if ((quantile(newKIRP$Immune_score)[4] <= i) && (i <= quantile(newKIRP$Immune_score)[5])) 
+    gr2 <- c(gr2,"Q4")
+}
+newKIRP <- cbind(newKIRP,gr2)
+par(mfrow=c(2,2))
+wilcox.test(newKIRP$V1~newKIRP$gr) ## 0.003298 **
+boxplot(newKIRP$V1~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 1",col=c("cadetblue","coral1"))
+boxplot(newKIRP$V1~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 1",col=c("cadetblue","cadetblue2","coral","coral3"))
+wilcox.test(newKIRP$V2~newKIRP$gr) ## 0.2632
+wilcox.test(newKIRP$V3~newKIRP$gr) ## 0.3898
+wilcox.test(newKIRP$V4~newKIRP$gr) ## 0.2357
+wilcox.test(newKIRP$V5~newKIRP$gr) ## 0.6751
+wilcox.test(newKIRP$V6~newKIRP$gr) ## 0.007948 **
+boxplot(newKIRP$V6~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 6",col=c("cadetblue","coral1"))
+boxplot(newKIRP$V6~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 6",col=c("cadetblue","cadetblue2","coral","coral3"))
+wilcox.test(newKIRP$V7~newKIRP$gr) ## 0.9141
+wilcox.test(newKIRP$V8~newKIRP$gr) ## 0.8915
+wilcox.test(newKIRP$V9~newKIRP$gr) ## 0.4719
+wilcox.test(newKIRP$V10~newKIRP$gr) ## 0.6435
+wilcox.test(newKIRP$V11~newKIRP$gr) ## 0.7505
+wilcox.test(newKIRP$V12~newKIRP$gr) ## 0.2068
+wilcox.test(newKIRP$V13~newKIRP$gr) ## 0.4608
+wilcox.test(newKIRP$V14~newKIRP$gr) ## 0.2823
+wilcox.test(newKIRP$V15~newKIRP$gr) ## 0.9488
+wilcox.test(newKIRP$V16~newKIRP$gr) ## 0.785
+wilcox.test(newKIRP$V17~newKIRP$gr) ## 0.7278
+wilcox.test(newKIRP$V18~newKIRP$gr) ## 0.3127
+wilcox.test(newKIRP$V19~newKIRP$gr) ## 0.002028 **
+boxplot(newKIRP$V19~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 19",col=c("cadetblue","coral1"))
+boxplot(newKIRP$V19~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 19",col=c("cadetblue","cadetblue2","coral","coral3"))
+wilcox.test(newKIRP$V20~newKIRP$gr) ## 0.5143
+wilcox.test(newKIRP$V21~newKIRP$gr) ## 0.405
+wilcox.test(newKIRP$V22~newKIRP$gr) ## 0.03125 **
+boxplot(newKIRP$V22~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 22",col=c("cadetblue","coral1"))
+boxplot(newKIRP$V22~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
+        main="Mutational signature 22",col=c("cadetblue","cadetblue2","coral","coral3"))
+wilcox.test(newKIRP$V23~newKIRP$gr) ## 0.2644
+wilcox.test(newKIRP$V24~newKIRP$gr) ## 0.6549
+wilcox.test(newKIRP$V25~newKIRP$gr) ## 0.2372
+wilcox.test(newKIRP$V26~newKIRP$gr) ## 0.2789
+wilcox.test(newKIRP$V27~newKIRP$gr) ## 0.319
+wilcox.test(newKIRP$V28~newKIRP$gr) ## 0.1283
+wilcox.test(newKIRP$V29~newKIRP$gr) ## 0.8259
+wilcox.test(newKIRP$V30~newKIRP$gr) ## 0.9301
+
+library(corrplot)
+corrplot(corr = cor(x = newKIRP[,c(2,7,20,23,32)], method = "spearman"), method = "number")
+cor.test(newKIRP$Immune_score,newKIRP$V1,method="spearman")
+cor.test(newKIRP$Immune_score,newKIRP$V6,method="spearman")
+cor.test(newKIRP$Immune_score,newKIRP$V19,method="spearman")
+cor.test(newKIRP$Immune_score,newKIRP$V22,method="spearman")
+summary(lm(Immune_score~V1+V6+V19+V22,data=newKIRP))
 
 ## Datos clinicos
 ## if (!requireNamespace("BiocManager"))
@@ -490,148 +652,7 @@ tbl2 <- table(as.factor(tab$surv.groupAGE),tab$surv.group19) ## 0.01793**
 tbl2 <- table(as.factor(tab$surv.groupAGE),tab$surv.group22) ## 0.7704
 chisq.test(tbl2)
 
-## Immune_score
-setwd("C:/Users/Esther/Desktop/Máster Bioinformática y Bioestadística/TFM/ESTIMATE")
-KIRPscore <- read.csv("kidney_renal_papillary_cell_carcinoma_RNAseqV2.txt",sep="\t")
-KIRPscore
-
-## Seleccionar las muestras que coinciden (list2)
-idfilt <- c()
-for (i in KIRPscore$ID){
-  z <- unlist(strsplit(i,"-"))
-  idfilt <- c(idfilt,paste0(z[1],"-",z[2],"-",z[3]))
-}
-idfilt2 <- unique(idfilt[idfilt %in% list2])
-
-KIRPscore$ID <- idfilt
-nums <- which(KIRPscore$ID %in% idfilt2)
-options(max.print=999999)
-
-## Base de datos IMMUNESCORE depurada
-newKIRPscore <- KIRPscore[nums,]
-newKIRPscore <- read.csv("KIRPscore.csv") ## Abrir directamente
-newKIRPscore <- newKIRPscore[,c(2:5)]
-
-## De aquí seleccionar dos grupos (<0 y >0)
-scorepos <- which(newKIRPscore$Immune_score >0) ## 150
-scoreneg <- which(newKIRPscore$Immune_score <0) ## 128
-
-## COSMIC
-setwd(wd)
-COSM <- read.csv("COSMICsignatures.csv", sep=";")
-COSM <- t(COSM)
-COSM <- COSM[-(1:2),]
-
-nfilt <- c()
-for (i in rownames(COSM)){
-  a <- unlist(strsplit(i,"[[:punct:]]"))
-  nfilt <- c(nfilt,paste0(a[1],"-",a[2],"-",a[3]))
-}
-nfilt2 <- nfilt[nfilt %in% list2]
-
-rownames(COSM) <- nfilt
-num <- which(rownames(COSM) %in% nfilt2)
-
-## Base de datos COSMIC depurada
-newCOSM <- COSM[num,]
-newCOSM <- read.csv("COSM.csv") ## Abrir directamente
-
-## Correlación
-newKIRP <- cbind(newCOSM,newKIRPscore$Immune_score)
-colnames(newKIRP)[32] <- "Immune_score"
-hist(newKIRP$Immune_score,xlab="Immune_score")
-shapiro.test(newKIRP$Immune_score) ## No normalidad - pruebas no paramétricas
-
-gr <- c()
-for (i in newKIRP$Immune_score){
-  if (i > median(newKIRP$Immune_score)) gr <- c(gr,1)
-  else gr <- c(gr,0)
-}
-newKIRP <- cbind(newKIRP,gr)
-gr2 <- c()
-for (i in newKIRP$Immune_score){
-  if ((quantile(newKIRP$Immune_score)[1] <= i) && (i < quantile(newKIRP$Immune_score)[2])) 
-    gr2 <- c(gr2,0)
-  if ((quantile(newKIRP$Immune_score)[2] <= i) && (i < quantile(newKIRP$Immune_score)[3])) 
-    gr2 <- c(gr2,1)
-  if ((quantile(newKIRP$Immune_score)[3] <= i) && (i < quantile(newKIRP$Immune_score)[4])) 
-    gr2 <- c(gr2,2)
-  if ((quantile(newKIRP$Immune_score)[4] <= i) && (i <= quantile(newKIRP$Immune_score)[5])) 
-    gr2 <- c(gr2,3)
-}
-newKIRP <- cbind(newKIRP,gr2)
-par(mfrow=c(2,2))
-wilcox.test(newKIRP$V1~newKIRP$gr) ## 0.003298 **
-boxplot(newKIRP$V1~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 1",col=c("cadetblue","coral1"))
-boxplot(newKIRP$V1~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 1",col=c("cadetblue","cadetblue2","coral","coral3"))
-wilcox.test(newKIRP$V2~newKIRP$gr) ## 0.2632
-wilcox.test(newKIRP$V3~newKIRP$gr) ## 0.3898
-wilcox.test(newKIRP$V4~newKIRP$gr) ## 0.2357
-wilcox.test(newKIRP$V5~newKIRP$gr) ## 0.6751
-wilcox.test(newKIRP$V6~newKIRP$gr) ## 0.007948 **
-boxplot(newKIRP$V6~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 6",col=c("cadetblue","coral1"))
-boxplot(newKIRP$V6~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 6",col=c("cadetblue","cadetblue2","coral","coral3"))
-wilcox.test(newKIRP$V7~newKIRP$gr) ## 0.9141
-wilcox.test(newKIRP$V8~newKIRP$gr) ## 0.8915
-wilcox.test(newKIRP$V9~newKIRP$gr) ## 0.4719
-wilcox.test(newKIRP$V10~newKIRP$gr) ## 0.6435
-wilcox.test(newKIRP$V11~newKIRP$gr) ## 0.7505
-wilcox.test(newKIRP$V12~newKIRP$gr) ## 0.2068
-wilcox.test(newKIRP$V13~newKIRP$gr) ## 0.4608
-wilcox.test(newKIRP$V14~newKIRP$gr) ## 0.2823
-wilcox.test(newKIRP$V15~newKIRP$gr) ## 0.9488
-wilcox.test(newKIRP$V16~newKIRP$gr) ## 0.785
-wilcox.test(newKIRP$V17~newKIRP$gr) ## 0.7278
-wilcox.test(newKIRP$V18~newKIRP$gr) ## 0.3127
-wilcox.test(newKIRP$V19~newKIRP$gr) ## 0.002028 **
-boxplot(newKIRP$V19~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 19",col=c("cadetblue","coral1"))
-boxplot(newKIRP$V19~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 19",col=c("cadetblue","cadetblue2","coral","coral3"))
-wilcox.test(newKIRP$V20~newKIRP$gr) ## 0.5143
-wilcox.test(newKIRP$V21~newKIRP$gr) ## 0.405
-wilcox.test(newKIRP$V22~newKIRP$gr) ## 0.03125 **
-boxplot(newKIRP$V22~newKIRP$gr,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 22",col=c("cadetblue","coral1"))
-boxplot(newKIRP$V22~newKIRP$gr2,xlab="Immune_score",ylab="Level of expression",
-        main="Mutational signature 22",col=c("cadetblue","cadetblue2","coral","coral3"))
-wilcox.test(newKIRP$V23~newKIRP$gr) ## 0.2644
-wilcox.test(newKIRP$V24~newKIRP$gr) ## 0.6549
-wilcox.test(newKIRP$V25~newKIRP$gr) ## 0.2372
-wilcox.test(newKIRP$V26~newKIRP$gr) ## 0.2789
-wilcox.test(newKIRP$V27~newKIRP$gr) ## 0.319
-wilcox.test(newKIRP$V28~newKIRP$gr) ## 0.1283
-wilcox.test(newKIRP$V29~newKIRP$gr) ## 0.8259
-wilcox.test(newKIRP$V30~newKIRP$gr) ## 0.9301
-
-## KICH
-library(RTCGAToolbox)
-kichData <- getFirehoseData(dataset="KICH", runDate="20160128", clinical=TRUE)
-clinickichData <- getData(kichData,"clinical")
-head(clinickichData)
-
-smpp <- row.names(clinickichData)
-smpp <- gsub("[[:punct:]]","-",smpp)
-smpp <- toupper(smpp) ## Para convertirlos en mayusculas y que concuerden con KIRP
-row.names(clinickichData) <- smpp
-smpp2 <- smpp[smpp %in% listt2]
-## Base de datos con las mismas muestras que en RNA-Seq (78).
-newclinickichData <- subset(clinickichData, row.names(clinickichData) %in% smpp2)
-newclinickichData <- newclinickichData[with(newclinickichData, order(row.names(newclinickichData))), ]
-
-newclinickichData <- newclinickichData[, 3:5]
-newclinickichData[is.na(newclinickichData[, 3]), 3] <- newclinickichData[is.na(newclinickichData[, 3]), 2]
-survkichData <- data.frame(Samples=rownames(newclinickichData),
-                       Time=as.numeric(newclinickichData[, 3]), Censor=as.numeric(newclinickichData[, 1]))
-
-getSurvival(dataObject=kichData, geneSymbols=c("PIK3CA"),
-            sampleTimeCensor=survkichData)
-
-## Immune_score
+## Immune_score KICH
 setwd("C:/Users/Esther/Desktop/Máster Bioinformática y Bioestadística/TFM/ESTIMATE")
 KICHscore <- read.csv("kidney_chromophobe_renal_cell_carcinoma_RNAseqV2.txt",sep="\t")
 KICHscore
@@ -680,7 +701,7 @@ newCOSMKICH <- read.csv("COSMKICH.csv") ## Abrir directamente
 ## Correlación
 newKICH <- cbind(newCOSMKICH,newKICHscore$Immune_score)
 colnames(newKICH)[32] <- "Immune_score"
-hist(newKICH$Immune_score,xlab="Immune_score")
+hist(newKICH$Immune_score,xlab="Immune_score",main="Histogram of Immune_score",col=("snow2"))
 shapiro.test(newKICH$Immune_score) ## No normalidad - pruebas no paramétricas
 
 grr <- c()
@@ -732,6 +753,30 @@ wilcox.test(newKICH$V27~newKICH$grr) ## 0.7495
 wilcox.test(newKICH$V28~newKICH$grr) ## 0.2331
 wilcox.test(newKICH$V29~newKICH$grr) ## 0.5797
 wilcox.test(newKICH$V30~newKICH$grr) ## 0.7512
+
+## Datos clinicos
+## KICH
+library(RTCGAToolbox)
+kichData <- getFirehoseData(dataset="KICH", runDate="20160128", clinical=TRUE)
+clinickichData <- getData(kichData,"clinical")
+head(clinickichData)
+
+smpp <- row.names(clinickichData)
+smpp <- gsub("[[:punct:]]","-",smpp)
+smpp <- toupper(smpp) ## Para convertirlos en mayusculas y que concuerden con KIRP
+row.names(clinickichData) <- smpp
+smpp2 <- smpp[smpp %in% listt2]
+## Base de datos con las mismas muestras que en RNA-Seq (78).
+newclinickichData <- subset(clinickichData, row.names(clinickichData) %in% smpp2)
+newclinickichData <- newclinickichData[with(newclinickichData, order(row.names(newclinickichData))), ]
+
+newclinickichData <- newclinickichData[, 3:5]
+newclinickichData[is.na(newclinickichData[, 3]), 3] <- newclinickichData[is.na(newclinickichData[, 3]), 2]
+survkichData <- data.frame(Samples=rownames(newclinickichData),
+                           Time=as.numeric(newclinickichData[, 3]), Censor=as.numeric(newclinickichData[, 1]))
+
+getSurvival(dataObject=kichData, geneSymbols=c("PIK3CA"),
+            sampleTimeCensor=survkichData)
 
 ## KM curves Immune_score
 row.names(newKICH) <- newKICH[,1]
