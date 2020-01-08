@@ -437,8 +437,8 @@ shapiro.test(newKIRP$Immune_score) ## No normalidad - pruebas no paramétricas
 
 gr <- c()
 for (i in newKIRP$Immune_score){
-  if (i > median(newKIRP$Immune_score)) gr <- c(gr,"G2")
-  else gr <- c(gr,"G1")
+  if (i > median(newKIRP$Immune_score)) gr <- c(gr,"High")
+  else gr <- c(gr,"Low")
 }
 newKIRP <- cbind(newKIRP,gr)
 gr2 <- c()
@@ -536,6 +536,138 @@ survData <- data.frame(Samples=rownames(newclinicData),
 
 getSurvival(dataObject=kirpData, geneSymbols=c("PIK3CA"),
             sampleTimeCensor=survData)
+
+
+## Analysis survival (IS)
+library(survival)
+row.names(newKIRP) <- newKIRP[,1]
+total <- cbind(newKIRP,newclinicData)
+filas1 <- as.factor(row.names(total)[as.numeric(total$Immune_score) <= summary(as.numeric(total$Immune_score))[3]])
+total2 <- total[row.names(total) %in% filas1,] ## low Immune_score
+filas2 <- as.factor(row.names(total)[as.numeric(total$Immune_score) > summary(as.numeric(total$Immune_score))[3]])
+totall2 <- total[row.names(total) %in% filas2,] ## high Immune_score
+par(mfrow=c(2,4))
+
+## KM curves FM1 LIS
+g1s <- as.factor(row.names(total2)[total2$V1 <= summary(total2$V1)[3]])
+g2s <- as.factor(row.names(total2)[total2$V1 > summary(total2$V1)[3]])
+time.group1 <- as.numeric(survData[c(g1s,g2s),2])
+censor.group1 <- as.numeric(survData[c(g1s,g2s),3])
+surv.group1 <- c()
+for (name in row.names(total2)){
+  if (name %in% g1s) surv.group1 <- c(surv.group1,1)
+  if (name %in% g2s) surv.group1 <- c(surv.group1,2)
+}
+surv.fit1 <- survfit(Surv(time.group1,censor.group1)~as.factor(surv.group1))
+surv.diff1 <- survdiff(Surv(time.group1,censor.group1)~as.factor(surv.group1))
+plot(surv.fit1, xlab="Time", ylab="Survival", main="SBS 1 low IS", col=c(2,4))
+## No significativo p = 0.7
+
+## KM curves FM1 HIS
+gg1s <- as.factor(row.names(totall2)[totall2$V1 <= summary(totall2$V1)[3]])
+gg2s <- as.factor(row.names(totall2)[totall2$V1 > summary(totall2$V1)[3]])
+time.group2 <- as.numeric(survData[c(gg1s,gg2s),2])
+censor.group2 <- as.numeric(survData[c(gg1s,gg2s),3])
+surv.group2 <- c()
+for (name in row.names(totall2)){
+  if (name %in% gg1s) surv.group2 <- c(surv.group2,1)
+  if (name %in% gg2s) surv.group2 <- c(surv.group2,2)
+}
+surv.fit2 <- survfit(Surv(time.group2,censor.group2)~as.factor(surv.group2))
+surv.diff2 <- survdiff(Surv(time.group2,censor.group2)~as.factor(surv.group2))
+plot(surv.fit2, xlab="Time", ylab="Survival", main="SBS 1 high IS", col=c(2,4))
+## No significativo p = 0.3
+
+## KM curves FM6 LIS
+h1s <- as.factor(row.names(total2)[total2$V6 <= summary(total2$V6)[3]])
+h2s <- as.factor(row.names(total2)[total2$V6 > summary(total2$V6)[3]])
+time.group3 <- as.numeric(survData[c(h1s,h2s),2])
+censor.group3 <- as.numeric(survData[c(h1s,h2s),3])
+surv.group3 <- c()
+for (name in row.names(total2)){
+  if (name %in% h1s) surv.group3 <- c(surv.group3,1)
+  if (name %in% h2s) surv.group3 <- c(surv.group3,2)
+}
+surv.fit3 <- survfit(Surv(time.group3,censor.group3)~as.factor(surv.group3))
+surv.diff3 <- survdiff(Surv(time.group3,censor.group3)~as.factor(surv.group3))
+plot(surv.fit3, xlab="Time", ylab="Survival", main="SBS 6 low IS", col=c(2,4))
+## No significativo p = 0.5
+
+## KM curves FM6 HIS
+hh1s <- as.factor(row.names(totall2)[totall2$V6 <= summary(totall2$V6)[3]])
+hh2s <- as.factor(row.names(totall2)[totall2$V6 > summary(totall2$V6)[3]])
+time.group4 <- as.numeric(survData[c(hh1s,hh2s),2])
+censor.group4 <- as.numeric(survData[c(hh1s,hh2s),3])
+surv.group4 <- c()
+for (name in row.names(totall2)){
+  if (name %in% hh1s) surv.group4 <- c(surv.group4,1)
+  if (name %in% hh2s) surv.group4 <- c(surv.group4,2)
+}
+surv.fit4 <- survfit(Surv(time.group4,censor.group4)~as.factor(surv.group4))
+surv.diff4 <- survdiff(Surv(time.group4,censor.group4)~as.factor(surv.group4))
+plot(surv.fit4, xlab="Time", ylab="Survival", main="SBS 6 high IS", col=c(2,4))
+## No significativo p = 0.7
+
+## KM curves FM19 LIS
+i1s <- as.factor(row.names(total2)[total2$V19 <= summary(total2$V19)[3]])
+i2s <- as.factor(row.names(total2)[total2$V19 > summary(total2$V19)[3]])
+time.group5 <- as.numeric(survData[c(i1s,i2s),2])
+censor.group5 <- as.numeric(survData[c(i1s,i2s),3])
+surv.group5 <- c()
+for (name in row.names(total2)){
+  if (name %in% i1s) surv.group5 <- c(surv.group5,1)
+  if (name %in% i2s) surv.group5 <- c(surv.group5,2)
+}
+surv.fit5 <- survfit(Surv(time.group5,censor.group5)~as.factor(surv.group5))
+surv.diff5 <- survdiff(Surv(time.group5,censor.group5)~as.factor(surv.group5))
+plot(surv.fit5, xlab="Time", ylab="Survival", main="SBS 19 low IS", col=c(2,4))
+## No significativo p = 0.8
+
+## KM curves FM19 HIS
+ii1s <- as.factor(row.names(totall2)[totall2$V19 <= summary(totall2$V19)[3]])
+ii2s <- as.factor(row.names(totall2)[totall2$V19 > summary(totall2$V19)[3]])
+time.group6 <- as.numeric(survData[c(ii1s,ii2s),2])
+censor.group6 <- as.numeric(survData[c(ii1s,ii2s),3])
+surv.group6 <- c()
+for (name in row.names(totall2)){
+  if (name %in% ii1s) surv.group6 <- c(surv.group6,1)
+  if (name %in% ii2s) surv.group6 <- c(surv.group6,2)
+}
+surv.fit6 <- survfit(Surv(time.group6,censor.group6)~as.factor(surv.group6))
+surv.diff6 <- survdiff(Surv(time.group6,censor.group6)~as.factor(surv.group6))
+plot(surv.fit6, xlab="Time", ylab="Survival", main="SBS 19 high IS", col=c(2,4))
+## No significativo p = 0.9
+
+## KM curves FM22 LIS
+j1s <- as.factor(row.names(total2)[total2$V22 <= summary(total2$V22)[3]])
+j2s <- as.factor(row.names(total2)[total2$V22 > summary(total2$V22)[3]])
+time.group7 <- as.numeric(survData[c(j1s,j2s),2])
+censor.group7 <- as.numeric(survData[c(j1s,j2s),3])
+surv.group7 <- c()
+for (name in row.names(total2)){
+  if (name %in% j1s) surv.group7 <- c(surv.group7,1)
+  if (name %in% j2s) surv.group7 <- c(surv.group7,2)
+}
+surv.fit7 <- survfit(Surv(time.group7,censor.group7)~as.factor(surv.group7))
+surv.diff7 <- survdiff(Surv(time.group7,censor.group7)~as.factor(surv.group7))
+plot(surv.fit7, xlab="Time", ylab="Survival", main="SBS 22 low IS", col=c(2,4))
+## No significativo p = 0.8
+
+## KM curves FM22 HIS
+jj1s <- as.factor(row.names(totall2)[totall2$V22 <= summary(totall2$V22)[3]])
+jj2s <- as.factor(row.names(totall2)[totall2$V22 > summary(totall2$V22)[3]])
+time.group8 <- as.numeric(survData[c(jj1s,jj2s),2])
+censor.group8 <- as.numeric(survData[c(jj1s,jj2s),3])
+surv.group8 <- c()
+for (name in row.names(totall2)){
+  if (name %in% jj1s) surv.group8 <- c(surv.group8,1)
+  if (name %in% jj2s) surv.group8 <- c(surv.group8,2)
+}
+surv.fit8 <- survfit(Surv(time.group8,censor.group8)~as.factor(surv.group8))
+surv.diff8 <- survdiff(Surv(time.group8,censor.group8)~as.factor(surv.group8))
+plot(surv.fit8, xlab="Time", ylab="Survival", main="SBS 22 high IS", col=c(2,4))
+## No significativo p = 0.5
+
 
 ## KM curves FM1
 library(survival)
